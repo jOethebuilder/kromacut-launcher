@@ -82,9 +82,7 @@ class SendToKromacut(inkex.EffectExtension):
         if self.options.mode == "lithophane":
             self._process_lithophane(raw_png, final_png)
         else:
-            # Color-layer processing pipeline isn't decided yet - passing
-            # the image through unchanged until that's scoped out.
-            final_png.write_bytes(raw_png.read_bytes())
+            self._process_colorlayer(raw_png, final_png)
 
         # 3. Launch Kromacut with the processed file as an argument.
         subprocess.Popen([kromacut_path, str(final_png)])
@@ -120,6 +118,24 @@ class SendToKromacut(inkex.EffectExtension):
 
         img = Image.open(src).convert("L")  # grayscale
         img = ImageOps.autocontrast(img, cutoff=1)  # stretch contrast
+        img.save(dst)
+
+    def _process_colorlayer(self, src: Path, dst: Path):
+        """Pipeline for Color Layer targets: auto-contrast, a saturation
+        boost (helps Kromacut separate distinct color regions), and a
+        slight sharpen (preserves edge detail for the layering)."""
+        try:
+            from PIL import Image, ImageEnhance, ImageOps
+        except ImportError:
+            raise inkex.AbortExtension(
+                "Pillow is required for Color Layer processing. Install it "
+                "into Inkscape's Python with: pip install Pillow"
+            )
+
+        img = Image.open(src).convert("RGB")
+        img = ImageOps.autocontrast(img, cutoff=1)
+        img = ImageEnhance.Color(img).enhance(1.3)       # +30% saturation
+        img = ImageEnhance.Sharpness(img).enhance(1.5)   # slight sharpen
         img.save(dst)
 
 
